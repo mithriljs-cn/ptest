@@ -1,3 +1,8 @@
+/* 
+Copyright @ Michael Yang 
+License MIT
+*/
+
 //phantomjs module
 var proc = require("child_process");
 var sys = require("system");
@@ -55,7 +60,7 @@ ws.onopen = function (e) {
 			  left: msg.data.scrollX
 			}
 			page.viewportSize = { width: msg.data.width, height: msg.data.height }
-			console.log( msg.type, JSON.stringify( msg.data ) )
+			// console.log( msg.type, JSON.stringify( msg.data ) )
 
 	        break
 
@@ -170,7 +175,7 @@ function init(){
 			window.addEventListener('mouseup', function(evt){
 			})
 			window.addEventListener('mousedown', function(evt){
-				console.log(evt.type, Date.now())
+				// console.log(evt.type, Date.now())
 				_phantom.setDot(evt.pageX,evt.pageY)
 			})
 		})

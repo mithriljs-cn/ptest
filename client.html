@@ -28,6 +28,10 @@
 <script type="text/javascript" src="./node_modules/util_debounce_throttle/dist/util_debounce_throttle.js"></script>
 <script type="text/javascript" src="./node_modules/mithril/mithril.min.js"></script>
 <script type="text/javascript">
+/* 
+Copyright @ Michael Yang 
+License MIT
+*/
 ws= new WebSocket('ws://'+ window.location.hostname +':1280');
 ws.onopen = function (e) {
   ws.onmessage = function (message) {
@@ -53,6 +57,14 @@ ws.onopen = function (e) {
             delete WS_CALLBACK[msg.__id]
             cb && cb(msg)
           }
+
+          break
+        case 'window_resize':
+        case 'window_scroll':
+          $(window).scrollLeft(msg.data.scrollX)
+          $(window).scrollTop(msg.data.scrollY)
+          $(window).width(msg.data.width)
+          $(window).height(msg.data.height)
 
           break
         case 'render':

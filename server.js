@@ -1,3 +1,7 @@
+/* 
+Copyright @ Michael Yang 
+License MIT
+*/
 'use strict'
 
 var fs=require("fs")
@@ -111,19 +115,18 @@ class EventPlayBack{
 
 	play(){
 		var self = this
-		console.log( self.status )
 		if(self.status === RUNNING) return;
 		if(self.status === PAUSED) return self.resume();
 		if(EventCache.length<3)return;
 		let prev = EventCache[2]
 		let last = EventCache[EventCache.length-1]
-		console.log('begin playBackEvent, total time(ms):', last.time-prev.time )
+		client_console('begin playback, total time:', last.time-prev.time, '(ms)' )
 		co(function *(){
 			for(let i=2, n=EventCache.length; i<n; i++){
 				if(self.status===STOPPING) {
 					self.cancel()
 					self.status = STOPPED
-					return 'play back stopped'
+					return 'playback stopped'
 				}
 				if(self.status===PAUSING) {
 					yield new Promise( (resolve, reject) => {
@@ -136,7 +139,7 @@ class EventPlayBack{
 						self.cancel = () => {
 							self.status = STOPPED
 							self.cancel = () => {}
-							reject('play back canceled')
+							reject('canceled')
 						}
 					})
 				}
@@ -144,20 +147,21 @@ class EventPlayBack{
 				let inter = e.time-prev.time
 				let result = yield new Promise( (resolve, reject) => {
 					setTimeout( () => {
-						// console.log(e.time, e.msg.type, e.msg.data)
+						// client_console(e.time, e.msg.type, e.msg.data)
 						toPhantom(e.msg)
+						if( /scroll|resize/.test(e.msg.type) ) toClient(e.msg);
 						prev = e
 						resolve(true)
 					}, inter )
 				})
 			}
-			return 'play back complete'
+			return 'playback complete'
 		}).then( (ret) => {
 			self.status = STOPPED
-			console.log(ret)
+			client_console(ret)
 		}, (err) => {
 			self.status = STOPPED
-			console.log('play back error', err)
+			client_console('playback incomplete:', err)
 		})
 	}
 
@@ -172,9 +176,7 @@ class EventPlayBack{
 }
 
 var playBack = new EventPlayBack()
-setTimeout(function(){
-	playBack.play()
-}, 10000)
+
 function clientList(){
   return wss.clients.map((v,i)=>v.name)
 }
@@ -188,6 +190,11 @@ function toClient(msg){
 function toPhantom(msg){
   var phantom = findClient('phantom')
   if(phantom) phantom._send(msg)
+}
+function client_console(){
+	var msg = ''
+	for(let i=0; i<arguments.length; i++) msg+=arguments[i]+' ';
+  	toClient( {type:'console_message', data: (new Date).toLocaleString() + ' [server] '+ msg} )
 }
 
 function broadcast(data) {
