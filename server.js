@@ -101,31 +101,80 @@ wss.on('connection', function connection(ws) {
 
 })
 
+var STOPPED = 0, STOPPING = 1, PAUSING = 2, PAUSED = 4, RUNNING = 8
+class EventPlayBack{
+	constructor(){
+		this.status = STOPPED
+		this.resume = () => {}
+		this.cancel = () => {}
+	}
 
-function playBackEvent(){
-	if(EventCache.length==0)return;
-	let prev = EventCache[0]
-	let last = EventCache[EventCache.length-1]
-	console.log('begin playBackEvent, total time(ms):', last.time-prev.time )
-	co(function *(){
-		for(let i=0, n=EventCache.length; i<n; i++){
-			let e=EventCache[i]
-			let inter = e.time-prev.time
-			let result = yield new Promise(function(resolve, reject) {
-				setTimeout(function(){
-					toPhantom(e.msg)
-					prev = e
-					resolve(true)
-				}, inter )
-			})
-		}
-		return 'play back complete'
-	}).then(function(ret){
-		console.log(ret)
-	}, function(err){
-		console.log('play back error', err)
-	})
+	play(){
+		var self = this
+		console.log( self.status )
+		if(self.status === RUNNING) return;
+		if(self.status === PAUSED) return self.resume();
+		if(EventCache.length<3)return;
+		let prev = EventCache[2]
+		let last = EventCache[EventCache.length-1]
+		console.log('begin playBackEvent, total time(ms):', last.time-prev.time )
+		co(function *(){
+			for(let i=2, n=EventCache.length; i<n; i++){
+				if(self.status===STOPPING) {
+					self.cancel()
+					self.status = STOPPED
+					return 'play back stopped'
+				}
+				if(self.status===PAUSING) {
+					yield new Promise( (resolve, reject) => {
+						self.status = PAUSED
+						self.resume = () => {
+							self.status = RUNNING
+							self.resume = () => {}
+							resolve()
+						}
+						self.cancel = () => {
+							self.status = STOPPED
+							self.cancel = () => {}
+							reject('play back canceled')
+						}
+					})
+				}
+				let e=EventCache[i]
+				let inter = e.time-prev.time
+				let result = yield new Promise( (resolve, reject) => {
+					setTimeout( () => {
+						// console.log(e.time, e.msg.type, e.msg.data)
+						toPhantom(e.msg)
+						prev = e
+						resolve(true)
+					}, inter )
+				})
+			}
+			return 'play back complete'
+		}).then( (ret) => {
+			self.status = STOPPED
+			console.log(ret)
+		}, (err) => {
+			self.status = STOPPED
+			console.log('play back error', err)
+		})
+	}
+
+	pause(){
+		this.status = PAUSING
+	}
+
+	stop(){
+		this.status = STOPPING
+	}
+
 }
+
+var playBack = new EventPlayBack()
+setTimeout(function(){
+	playBack.play()
+}, 10000)
 function clientList(){
   return wss.clients.map((v,i)=>v.name)
 }

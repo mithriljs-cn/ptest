@@ -55,7 +55,7 @@ ws.onopen = function (e) {
 			  left: msg.data.scrollX
 			}
 			page.viewportSize = { width: msg.data.width, height: msg.data.height }
-			// console.log( JSON.stringify( msg.data ) )
+			console.log( msg.type, JSON.stringify( msg.data ) )
 
 	        break
 
@@ -119,7 +119,14 @@ page.onConsoleMessage=function(msg){
 	ws._send( {type:'console_message', data:msg} )
 }
 
+var renderRun = true
 var renderCount = 0
+function renderPage(){
+	var prevPos = page.scrollPosition
+	page.scrollPosition = {   top: 0 ,   left: 0 }
+	ws._send( {type:'render', data: page.renderBase64('JPEG'), meta:{ count:renderCount++, size:page.viewportSize } } )
+	page.scrollPosition = prevPos
+}
 function renderLoop(){
 	setTimeout(function(){
 		// page.clipRect = {
@@ -128,10 +135,7 @@ function renderLoop(){
 		//   width: page.viewportSize.width,
 		//   height: page.viewportSize.height
 		// }
-		var prevPos = page.scrollPosition
-		page.scrollPosition = {   top: 0 ,   left: 0 }
-		ws._send( {type:'render', data: page.renderBase64('JPEG'), meta:{ count:renderCount++, size:page.viewportSize } } )
-		page.scrollPosition = prevPos
+		if(renderRun) renderPage()
 		renderLoop()
 	}, 100)
 }
