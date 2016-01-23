@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ptest client</title>
+<style type="text/css">
+*{
+  margin: 0;
+  padding: 0;
+}
+.imgCon,
+.screenshot{
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+</style>
+</head>
+<body>
+
+<div id="phantom">
+  <div class="imgCon" onselectstart="return false;" ondragstart="return false;" contenteditable=false><img onselectstart="return false;" ondragstart="return false;" contenteditable=false class="screenshot" /></div>
+</div>
+<div id="console"></div>
+
+<script type="text/javascript" src="./js/jquery.min.js"></script>
+<script type="text/javascript" src="./node_modules/util_debounce_throttle/dist/util_debounce_throttle.js"></script>
+<script type="text/javascript" src="./node_modules/mithril/mithril.min.js"></script>
+<script type="text/javascript">
+ws= new WebSocket('ws://'+ window.location.hostname +':1280');
+ws.onopen = function (e) {
+  ws.onmessage = function (message) {
+
+      var msg; try{ msg=JSON.parse(message.data) }catch(e){ msg=message.data }
+
+      switch(msg.type){
+
+        case 'broadcast':
+
+          break
+        case 'console_error':
+          console.error( msg.data.msg, JSON.stringify(msg.data.stack) )
+
+          break
+        case 'console_message':
+          console.log( msg.data )
+
+          break
+        case 'command_result':
+          if(msg.__id){
+            var cb = WS_CALLBACK[msg.__id]
+            delete WS_CALLBACK[msg.__id]
+            cb && cb(msg)
+          }
+
+          break
+        case 'render':
+          $('.imgCon').width( msg.meta.size.width ).height( msg.meta.size.height )
+          $('.screenshot').attr('src', 'data:image/png;base64,'+ msg.data)
+          if( msg.meta.count==0 ) $(window).trigger('resize')
+          break
+
+        default:
+          
+          break
+      }
+
+  }
+  ws.onclose = function (code, reason, bClean) {
+    console.log("ws error: ", code, reason);
+  }
+  ws._send({type:'connection', meta:'server', name:'client'})
+}
+
+var WS_CALLBACK = {}
+ws._send = function(msg){
+  if(ws.readyState!=1) return
+  ws.send( typeof msg=='string' ? msg : JSON.stringify(msg) )
+}
+ws._send_debounce = util_debounce_throttle._debounce( ws._send, 30)
+ws._send_throttle = util_debounce_throttle._throttle( ws._send, 30, true )
+ws._send_throttle2 = util_debounce_throttle._throttle( ws._send, 30, false )
+
+ws._call = function(msg, cb) {
+  msg.__id = '_'+Date.now()+Math.random()
+  WS_CALLBACK[msg.__id] = cb
+  ws._send(msg)
+}
+
+
+function sc(str){
+  ws._call({type:'command', meta:'server', data:str}, function(msg){
+    console.log(msg.result)
+  })
+}
+function cc(str){
+  ws._call({type:'command', meta:'', data:str}, function(msg){
+    console.log(msg.result)
+  })
+}
+
+function registerEvent(){
+    $(window).on('resize', function(e){
+      var data = { scrollX:window.scrollX, scrollY:window.scrollY, width:$(window).width(), height:$(window).height()}
+      ws._send_debounce({ type:'window_resize', data:data })
+    })
+    $(window).trigger('resize')
+
+    $(window).on('scroll', function(e){
+      var data = { scrollX:window.scrollX, scrollY:window.scrollY, width:$(window).width(), height:$(window).height()}
+      ws._send_throttle2({ type:'window_scroll', data:data })
+    })
+    $(window).trigger('scroll')
+
+
+  var eventList = [
+    'mousedown', 
+    'mouseup',
+    'mousemove',
+    'click',
+    'dblclick',
+  ]
+  eventList.forEach(function(v){
+    document.addEventListener(v, function(e){
+      var evtData = { type:e.type, pageX:e.pageX-window.scrollX, pageY:e.pageY-window.scrollY, which:e.which }
+      // var a=util._extend({}, e)
+      // var evtData=util._exclude(a, {view:1,target:1,toElement:1,srcElement:1,path:1})
+      // evtData.scrollX = window.scrollX
+      // evtData.scrollY = window.scrollY
+      if(evtData.type=='mousemove') ws._send_throttle({ type:'event_mouse', data:evtData })
+      else ws._send({ type:'event_mouse', data:evtData })
+    })
+  })
+}
+registerEvent()
+
+</script>
+</body>
+</html>
