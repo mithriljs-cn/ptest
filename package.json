@@ -9,8 +9,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "co": "^4.6.0",
     "mithril": "^0.2.0",
     "util_debounce_throttle": "^1.0.0",
+    "util_extend_exclude": "^1.0.4",
     "ws": "^1.0.1"
   }
 }

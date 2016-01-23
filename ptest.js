@@ -56,7 +56,7 @@ ws.onopen = function (e) {
 			}
 			page.viewportSize = { width: msg.data.width, height: msg.data.height }
 			// console.log( JSON.stringify( msg.data ) )
-			
+
 	        break
 
 	      // command from client.html
@@ -83,7 +83,9 @@ ws.onopen = function (e) {
           	break
 	      case 'event_mouse':
 	      	var e = msg.data
+	      	// console.log(e.type, e.pageX, e.pageY, e.which)
 	      	e.type = e.type.replace('dbl', 'double')
+	      	if( /click|down|up/.test(e.type) ) page.sendEvent('mousemove', e.pageX, e.pageY, WHICH_MOUSE_BUTTON[e.which] );
 	      	page.sendEvent(e.type, e.pageX, e.pageY, WHICH_MOUSE_BUTTON[e.which] )
 
 	      	break
@@ -138,16 +140,8 @@ function createCursor(){
 	page.evaluate(function(){
 		window._phantom.dot = (function(){
 			var dot = document.createElement("div"); 
-			dot.className = "dot"; 
-			dot.style.backgroundColor="rgba(255,0,0,0.8)";
-			dot.style.width="10px";
-			dot.style.height="10px";
-			dot.style.position="absolute";
-			dot.style.zIndex="99999999999"; 
-			dot.style['pointer-events']='none'; 
-			dot.style.borderRadius = "100px"; 
-			dot.style.left = 0 + "px"; 
-			dot.style.top = 0 + "px"; 
+			dot.style.cssText = 'pointer-events:none; border-radius:100px; background:rgba(255,0,0,0.8); width:10px; height:10px; position:absolute; z-index:9999999999;'
+			dot.style.zIndex=Math.pow(2,53); 
 			document.body.appendChild(dot);
 			return dot
 		})()
@@ -170,11 +164,10 @@ function init(){
 				_phantom.setDot(evt.pageX,evt.pageY)
 			})
 			window.addEventListener('mouseup', function(evt){
-				console.log(evt.type, Date.now())
 			})
 			window.addEventListener('mousedown', function(evt){
+				console.log(evt.type, Date.now())
 				_phantom.setDot(evt.pageX,evt.pageY)
-				console.log(evt.type, evt.pageX, evt.pageY, Date.now())
 			})
 		})
 	})

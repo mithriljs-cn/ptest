@@ -1,6 +1,10 @@
+'use strict'
+
 var fs=require("fs")
 var http=require("http")
 var path=require("path")
+var co=require("co")
+var _util=require("util_extend_exclude")
 var spawn=require("child_process").spawn
 
 var HTTP_HOST = '0.0.0.0'
@@ -40,7 +44,7 @@ HttpServer.listen(HTTP_PORT, HTTP_HOST)
 
 console.log('server started at %s:%s', HTTP_HOST, HTTP_PORT )
 
-
+var EventCache = []
 // create WS Server
 var WebSocketServer = require('ws').Server
 var wss = new WebSocketServer({ port: WS_PORT })
@@ -54,6 +58,7 @@ wss.on('connection', function connection(ws) {
   ws.on('message', function incoming(message) {
     // console.log('received: %s', message)
     var msg; try{ msg=JSON.parse(message) }catch(e){ msg=message }
+    if(typeof msg!=='object') return;
     switch(msg.type){
 
       case 'connection':
@@ -76,7 +81,12 @@ wss.on('connection', function connection(ws) {
         }
 
       default:
-        ws.name==='client'? toPhantom(msg) : toClient(msg)
+        if( ws.name==='client' ){
+        	EventCache.push( { time:Date.now(), msg:_util._extend({}, msg) } )
+        	toPhantom(msg)
+        } else {
+        	toClient(msg)
+        }
         break
 
     }
@@ -92,6 +102,30 @@ wss.on('connection', function connection(ws) {
 })
 
 
+function playBackEvent(){
+	if(EventCache.length==0)return;
+	let prev = EventCache[0]
+	let last = EventCache[EventCache.length-1]
+	console.log('begin playBackEvent, total time(ms):', last.time-prev.time )
+	co(function *(){
+		for(let i=0, n=EventCache.length; i<n; i++){
+			let e=EventCache[i]
+			let inter = e.time-prev.time
+			let result = yield new Promise(function(resolve, reject) {
+				setTimeout(function(){
+					toPhantom(e.msg)
+					prev = e
+					resolve(true)
+				}, inter )
+			})
+		}
+		return 'play back complete'
+	}).then(function(ret){
+		console.log(ret)
+	}, function(err){
+		console.log('play back error', err)
+	})
+}
 function clientList(){
   return wss.clients.map((v,i)=>v.name)
 }
